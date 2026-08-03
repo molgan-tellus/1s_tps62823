@@ -1,0 +1,10 @@
+# KiCad temporara/lokala filer
+*.lck
+.~lock.*
+*-backups/
+fp-info-cache
+*.kicad_prl
+_autosave-*
+*-save.kicad_*
+# uppzippad arbetskopia av gerber-zippen
+jlcpcb/power_kicad_gerber/

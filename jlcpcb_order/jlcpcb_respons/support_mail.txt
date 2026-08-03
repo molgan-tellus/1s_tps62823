@@ -1,0 +1,56 @@
+Subject: Re: Order [ORDER NUMBER] — placement NOT confirmed yet: 10 orientation corrections needed first
+
+Hello,
+
+Thank you. In answer to your confirmation request: I do NOT confirm the component
+layout as currently shown. I have reviewed the Part Placement preview and found 10
+components whose orientation does not match the design. Please correct the following
+and send me an updated placement preview — I will confirm promptly once these are fixed.
+
+In every case the correct orientation is shown by our silkscreen markings, which are
+visible in your preview: a small white triangle marks pin 1 of each IC, and the white
+silkscreen bracket at one end of each diode marks the cathode end.
+
+DIODES (both on the BOTTOM side — currently shown reversed in the preview):
+- D1 (SMF5.0A):  rotate 180 deg. Cathode band at the silkscreen-bracket end
+                 = toward the USB-C end of the board.
+- D4 (SS54):     rotate 180 deg. Cathode band toward the USB-C end of the board.
+
+ICs — pin 1 must sit at the silkscreen triangle:
+- U7 (TCA6408A, VQFN-16, bottom): rotate 90 deg counterclockwise as displayed in your
+                 bottom-side preview, so the package pin-1 dot is at the UPPER-LEFT,
+                 aligned with the silkscreen triangle.
+- Q7 (2N7002DW, SC-70-6, bottom): rotate 180 deg; pin 1 at the LOWER-RIGHT in your
+                 bottom-side preview, at the silkscreen triangle.
+- U2 (TP4056, ESOP-8, top):       pin 1 at the UPPER-LEFT (silkscreen triangle).
+- U3 (DW01A, SOT-23-6, top):      pin 1 at the UPPER-LEFT.
+- Q1 (8205A, SOT-23-6, top):      pin 1 at the UPPER-LEFT.
+- Q2 (AO4407A, SOIC-8, top):      pin 1 at the UPPER-LEFT.
+- U4 (INA226, VSSOP-10, top):     pin 1 at the UPPER-LEFT (your preview currently
+                 shows the package pin-1 dot at the lower-left).
+- U6 (TPS62823, VSON-8, top):     pin 1 at the UPPER-LEFT.
+
+Directions refer to your Part Placement preview as displayed: for the top side,
+"upper" = the board edge with the SOL solder pads and test points TP1-TP3, and
+"left" = the USB-C connector end.
+
+The following polarized parts are shown CORRECTLY in the preview — please keep them
+exactly as shown: D2, D3, D5, LED1, LED2, U5, Q3, Q4, Q5, Q6, Q9.
+
+One additional question: F1 (MSMD200/16 PTC fuse, LCSC C5128770, bottom side) is the
+only component shown in the placement preview WITHOUT a component body — its pads are
+empty with only a small checkered placeholder marker at its position, and it has no
+designator label, although it is included in the matched BOM (qty for all boards).
+Please confirm that F1 will be assembled on its pads. It is a non-polarized part, so
+orientation does not matter.
+
+The root cause of the orientation issues is the rotation convention in our CPL file
+(KiCad zero-orientation). Please align all polarized/keyed components with the
+silkscreen pin-1 triangles and diode cathode brackets.
+
+To summarize: please (1) correct the 10 orientations listed above, (2) confirm F1
+will be assembled, and (3) send an updated placement preview. I will confirm the
+layout as soon as I see the corrected preview.
+
+Thank you!
+[NAME]
