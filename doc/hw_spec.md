@@ -187,6 +187,49 @@ Därefter ~5 ms innan SX1262-init. I sömn: allt av i omvänd ordning (radior �
   lita inte blint på mätvärden nära urladdningsgränsen.
 - Vid USB-drift ser shunten bara cellens nettoström (≈ laddström), inte systemlasten.
 
+### 6. Minimalt setup-exempel (Arduino-stil)
+Inkoppling: batteri i J2, J7-5/6 → MCU:ns SDA/SCL, J7-3 (3V3_MCU) → MCU:ns matning.
+Mer behövs inte — exemplet startar buck + radio 1 och läser cellströmmen:
+
+```cpp
+#include <Wire.h>
+#define EXP 0x20                      // TCA6408A
+#define INA 0x40                      // INA226
+
+void wr8(uint8_t a, uint8_t r, uint8_t v) {
+  Wire.beginTransmission(a); Wire.write(r); Wire.write(v); Wire.endTransmission();
+}
+void wr16(uint8_t a, uint8_t r, uint16_t v) {
+  Wire.beginTransmission(a); Wire.write(r); Wire.write(v >> 8); Wire.write(v & 0xFF);
+  Wire.endTransmission();
+}
+uint16_t rd16(uint8_t a, uint8_t r) {
+  Wire.beginTransmission(a); Wire.write(r); Wire.endTransmission(false);
+  Wire.requestFrom(a, (uint8_t)2);
+  return (Wire.read() << 8) | Wire.read();
+}
+
+void setup() {
+  Wire.begin();
+  // 1. SCL-recovery utelamnad har (krav i skarp firmware, se punkt 1)
+  wr8(EXP, 0x01, 0x00);               // 2. output FORE config
+  wr8(EXP, 0x03, 0xC0);               //    P0-P5 utgangar, P6-P7 ingangar
+  wr16(INA, 0x05, 0x1400);            // 3. INA226-kalibrering: 10 mOhm, 0,1 mA/bit
+  wr8(EXP, 0x01, 0x20);               // 4. buck pa ...
+  delay(2);                           //    ... >=1 ms (PG okopplad)
+  wr8(EXP, 0x01, 0x2A);               // 5. + radio 1 + 196 mA laddniva
+  delay(5);                           // 6. darefter SX1262-init
+}
+
+void loop() {
+  int16_t raw = (int16_t)rd16(INA, 0x04);
+  float cell_mA = raw * 0.1f;         // urladdning positiv, laddning negativ
+  rd16(EXP, 0x00);                    // slapp INT-latchen (330 uA-fallan)
+  delay(1000);
+  // Somn: wr8(EXP, 0x01, 0x00) + INA226 MODE=000 + MCU deep sleep
+}
+```
+
 ## Typisk driftcykel (LoRa-nod)
 
 ```
