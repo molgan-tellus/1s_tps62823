@@ -22,7 +22,7 @@ granskad i zoom: **alla 10 rätt, keep-as-is-delarna orörda**. F1 (MSMD200/16, 
 utan kropp i första previewn — bekräftad monterad (bara saknad preview-modell hos JLC).
 **Layouten bekräftad ("Yes, please proceed") 2026-08-03 → produktion.**
 
-## Rev A.2: omrutning av kraftvägar + äkta Kelvin (EJ incheckad)
+## Rev A.2: omrutning av kraftvägar + äkta Kelvin
 PCB-djupgranskningen fann att "beställningsklar" inte höll: Kelvin bruten (~5× INA226-fel),
 batterivägar i 0,2 mm på 0,5 oz-innerlager (~0,4 A-klass mot dokumenterade 1,5 A), hela 3V3
 på en enda via, och RST_EXP/VSOL_J som klöv In2-planet. Allt omrutat med kollisionsvaliderad
@@ -41,7 +41,7 @@ på CELL_N-F, ΔT ~25–30 °C @1,5 A); **J7-1 max 0,5 A** (In1-matning). Kelvin
 **Kvar till rev B:** SW-snubberstub + RF1-under-L1 (båda verbatim-återställda; kräver
 komponentflytt), In1-väst-splitten, silk-läsbarhetspasset.
 
-## Schemagranskning + åtgärder 2026-08-02 (EJ incheckade ännu)
+## Schemagranskning + åtgärder 2026-08-02
 Fjärde granskningen (input range + sanity check av hela nätlistan; detaljer i
 doc/DESIGN.md §Schemagranskning 2026-08-02). Nätlistan höll — all delarmatte omräknad OK.
 **Åtgärdat:**
@@ -81,16 +81,15 @@ DRC efter åtgärd: 0 fel, 0 okopplade; clearance 0,127 intakt. BOM/CPL oförän
 
 
 ## Läget just nu
-- **Rev A.1 är klar och incheckad**: ERC 0, DRC 0 fel / 0 okopplade, netlista↔PCB verifierad
-  (enda diff: U6.8 PG, avsiktligt okopplad). Netclass-clearance 0,127 mm intakt.
-- `jlcpcb/` är **beställningsklar**: gerber+borr-zip (separata PTH/NPTH-filer), BOM 42 rader,
-  CPL 81 rader — byggda från projektroten med `gen_jlc.py`. Renders omgjorda.
-- Full designgranskning genomförd 2026-07-31: **konstruktionen håller** — alla pinouter
-  verifierade mot datablad, all delarmatte omräknad (laddsteg 50/86/196/595/742 mA,
-  VBS 3,0 V, VSOL 0,4×källa, buck-FB 3,31 V), power-path-logiken korrekt i alla fyra
-  matningsfall. Tre nya fynd dokumenterade i doc/DESIGN.md (se nedan) — **inget blockerar
-  beställning**.
-- **EJ beställd, EJ fysiskt prototypad.**
+- **Rev A.2 beställd 2026-08-02, produktion godkänd 2026-08-03** — inväntar leverans.
+  Allt incheckat (commit `59e9f96` = det beställda läget).
+- Verifierat läge: ERC 0, DRC 0 fel / 0 okopplade, netlista↔PCB verifierad (enda diff:
+  DNP-paddarna R16.1/C13.2 + U6.8 PG, avsiktligt). Netclass-clearance 0,127 mm intakt.
+- Full designgranskning 2026-07-31: **konstruktionen håller** — alla pinouter verifierade
+  mot datablad, all delarmatte omräknad (laddsteg 50/86/196/595/742 mA, VBS 3,0 V,
+  VSOL 0,4×källa, buck-FB 3,31 V), power-path-logiken korrekt i alla fyra matningsfall.
+  Datablad för alla BOM-delar cachade i `doc/datasheets/` (`<MPN>_<LCSC-nr>.pdf`).
+- **EJ fysiskt prototypad.**
 
 ## Granskningsfynd att komma ihåg (detaljer i doc/DESIGN.md §Designgranskning 2026-07-31)
 1. **330 µA-fällan (viktigast)**: TCA6408A INT latchar låg vid USB-i/urkoppling (VBS flippar)
@@ -105,23 +104,20 @@ Mindre (accepterade): buck-dropout under ~3,5 V cell; USB-strömbudget oförhand
 (byglad VSOL_J ser portsag); INA226 under VS-spec vid cell 2,75–3,0 V; D1-TVS efter ferriten.
 
 ## Att göra härnäst (i ordning)
-0. *(Valfritt före beställning)* Silk-läsbarhetspass: höj funktionsetiketterna (J7-raden,
-   SOL, RF-raden) till ≥0,8 mm och isära TP1–TP3/TP9/R32-klustret; kräver ny gerber-regen.
-1. **Beställ 5 st hos JLCPCB**: ladda upp `jlcpcb/power_kicad_gerber.zip` + `BOM.csv` + `CPL.csv`.
-   4 lager, 1,0 mm, Standard-assembly dubbelsidig. I varukorgen: slutlig lagerkoll på
-   TPS62823 (7k), 8205A (8k), TCA6408ARGTR (C181499) — och **granska rotationerna i
-   JLC:s förhandsvisning** (deras vinkelkonvention avviker per kapsel).
-2. **Firmware-förberedelse** (kan ske under leveranstiden):
+1. **Firmware-förberedelse** (under leveranstiden):
    - Init-ordning TCA6408A: 9-puls SCL-recovery → skriv Output=0x00 **FÖRE** Config=0xC0.
    - Läs reg 0x00 vid varje uppvak (330 µA-fällan).
    - Buck (0x20) FÖRE radio-EN (0x08/0x10), ~1 ms mellanrum; PG är okopplad.
    - MPPT-P&O: stega, vänta ~1 s, läs INA226 (laddström = negativ); backa vid fall.
-3. **Prototypvalidering** (mätplan i CLAUDE.md/doc/DESIGN.md):
+2. **Prototypvalidering vid leverans** (mätplan i CLAUDE.md/doc/DESIGN.md):
    - TP7/PROG med oscilloskop på alla fyra MPPT-nivåer (kapacitanskänslig nod).
    - Sömnström <15 µA — inklusive efter USB-i/ur-cykel (fynd 1).
    - Power path-omslag (USB i/ur under last), laddterminering, RF-rails renhet.
-4. **Rev B-kandidater** (utöver doc/DESIGN.md:s lista): power-path-FET med lägre Vth,
-   ev. hårdvaru-SoC, kraftigare solklamp om felpaneler är ett verkligt scenario.
+   - Kelvin-restfel ~2–3 %: kalibrera INA226 mot känd last.
+3. **Rev B-kandidater** (utöver doc/DESIGN.md:s lista och §Rev A.2:s "Kvar till rev B"):
+   power-path-FET med lägre Vth, ev. hårdvaru-SoC, kraftigare solklamp om felpaneler
+   är ett verkligt scenario, In1-planets klyvning, silk-läsbarhetspasset
+   (funktionsetiketter ≥0,8 mm, isära TP1–TP3/TP9/R32-klustret).
 
 ## Kom-ihåg för arbetssättet
 - Kör **ALDRIG** om `gen_pcb.py` (raderar handrutad routing). `gen_sch.py` är säker.

@@ -3,16 +3,19 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Projektet
-LiPo-kraftmodul (rev A.1) för LoRa-noder: 55,88×20,32 mm, 4 lager, nRF52840 Connect Kit-format.
+LiPo-kraftmodul (rev A.2) för LoRa-noder: 55,88×20,32 mm, 4 lager, nRF52840 Connect Kit-format.
 TP4056-laddning (USB-C/sol, MPPT-steg 50/86/196/595 mA), 6,8 V-zenerklamp,
 DW01A+8205A cellskydd, INA226 (I2C 0x40), diskret power path, HT7833 alltid-på-LDO,
 TPS62823 3 A buck, 2× brytbara π-filtrerade radiorails. Sömn 11–15 µA.
 Rev A.1: all styrning via TCA6408A GPIO-expander (U7, I2C 0x20) — MP0–2, EN_RF1/2, BUCK_EN,
 VBS-läsning; J8 utgick, ersatt av TP1–TP11 (fri koppar) + VSOL-delare med lödbygel JP1 → J7-9.
-**Status: ERC 0, DRC 0, 0 okopplade. Beställningsklar, EJ fysiskt prototypad.**
+Rev A.2: kraftvägarna omrutade (äkta Kelvin till INA226, batteriväg breddad, 3V3-viafix).
+**Aktuellt beställnings-/produktionsläge står i `STATUS.md` — inte här.**
 Läs `STATUS.md` (aktuellt läge, granskningsfynd, nästa steg) och `doc/DESIGN.md`
 (alla designbeslut + kända begränsningar) först; `BOM.md` listar LCSC-verifierade delar.
 `doc/hw_spec.md` (+ .odt/.pdf) är den användarvända specen — uppdatera vid funktionsändringar.
+Katalogen hette `full_tps62823` t.o.m. 2026-08-03 — äldre skript/dokument kan ha den
+gamla sökvägen hårdkodad.
 
 ## Katalogstruktur
 - **Roten** — KiCad-filerna (`power_kicad.*`), genererings-/engångsskripten och
@@ -20,6 +23,8 @@ Läs `STATUS.md` (aktuellt läge, granskningsfynd, nästa steg) och `doc/DESIGN.
 - **`doc/`** — dokumentation: `DESIGN.md` (designbeslut), `hw_spec.md` + genererade
   `power_kicad_hw_spec.odt/.pdf`, `kostnad.md`, `Genomgången klar hela.txt`,
   3D-renders (`render_*.png`), JLC-preview-skärmdumpar (`jlpcb_a/b.png`).
+- **`doc/datasheets/`** — lokalt cachade datablad för alla BOM-delar, namngivna
+  `<MPN>_<LCSC-nr>.pdf` — läs härifrån i första hand i stället för att hämta via wmsc-URL:en.
 - **`jlcpcb/`** — tillverkningsfiler: `power_kicad_gerber.zip`, `BOM.csv`, `CPL.csv`
   + råexporter (se §Tillverkningsfiler; den uppzippade `power_kicad_gerber/` är gitignorerad).
 - **`jlcpcb_order/`** — orderunderlag för rev A.2-beställningen: markerade preview-bilder
@@ -74,8 +79,9 @@ kicad-cli pcb drc power_kicad.kicad_pcb --format json --severity-error -o drc.js
    koordinater kolliderar alltid.
 
 ### Engångsskript (mallar, kör INTE om som de är)
-`import_ses.py`, `smart_route.py` och `surgery.py` innehåller hårdkodade sökvägar
-(döda scratchpad-paths) och koordinater från specifika fixar. Deras *mönster* är återanvändbara:
+`import_ses.py`, `smart_route.py`, `surgery.py`, `rt.py` och `phases.py` innehåller
+hårdkodade sökvägar (döda scratchpad-paths respektive gamla `full_tps62823`-vägen)
+och koordinater från specifika fixar. Deras *mönster* är återanvändbara:
 - `import_ses.py` — SES-parser (tokenize/parse) + kraftnätsbreddning + zonfyllning. Uppdatera `SES`-sökvägen.
 - `smart_route.py` — kollisionsvaliderad handrouting: bygger hinderkarta (spår/vior/pads),
   `seg_ok`/`via_ok` testar varje segment mot clearance 0,13 mm innan det läggs, `find_lane`
@@ -83,6 +89,13 @@ kicad-cli pcb drc power_kicad.kicad_pcb --format json --severity-error -o drc.js
 - `surgery.py` — textuell s-expressionskirurgi på `.kicad_pcb`: `find_blocks` (balanserad
   parentesmatchning) för att ta bort segment/vior/footprints per nät-id, ändra pad-nät,
   flytta footprints. Byt ut åtgärdslistan.
+- `rt.py` — routing-toolkit som modul (`import rt`): hinderkarta, kollisionsvaliderad
+  segment-/via-placering (clearance 0,13, hål-hål 0,5), nätgraf-verifiering. Mest
+  återanvändbar av skripten — men `PCB`-konstanten pekar på gamla `full_tps62823`-vägen;
+  uppdatera den först.
+- `phases.py` — rev A.2-kirurgin som numrerade faser ovanpå `rt.py`, en fas per
+  python-process (pcbnew-regeln); `sys.path` pekar på död scratchpad. Bra mall för
+  hur delete- och build-faser separeras.
 
 ## Tillverkningsfiler (`jlcpcb/`)
 Efter varje brädändring: regenerera gerber+borr+zip och BOM/CPL **från projektroten** (inte scratchpad).
@@ -90,8 +103,12 @@ BOM/CPL byggs reproducerbart med `gen_jlc.py` — råexport-kommandona står i d
 `kicad-cli sch export bom` → `jlcpcb/bom_raw.csv`, `kicad-cli pcb export pos` → `jlcpcb/pos_raw.csv`,
 sedan `python3 gen_jlc.py` → `BOM.csv`/`CPL.csv`. LCSC-nummer tas från symbolens LCSC-fält,
 annars `VALMAP` (passiva); skriptet varnar om nummer saknas. Exkluderas ur bestyckning:
-H1–H4, J3, J4, J7, R16, C13, JP1, TP1–TP11 (`EXCL` + `TP\d+`). Beställning: 4 lager, 1,0 mm,
-Standard-assembly dubbelsidig; granska rotationer i JLC:s förhandsvisning.
+H1–H4, J3, J4, J7, R16, C13, JP1, TP1–TP11 (`EXCL` + `TP\d+`).
+**`--ref-range-delimiter ""` i BOM-exporten är obligatorisk** — utan den komprimerar
+kicad-cli referenslistor till intervall (`R17-R20`) som JLC inte tolkar (bet oss 2026-08-02).
+Beställning: 4 lager, 1,0 mm, Standard-assembly dubbelsidig; granska rotationer i JLC:s
+förhandsvisning (deras vinkelkonvention avviker per kapsel — 10 delar krävde
+korrigeringsmail vid A.2-beställningen, se `jlcpcb_order/`).
 
 ## Nästa steg
 Aktuell att-göra-lista, granskningsfynd (bl.a. 330 µA-fällan) och firmware-krav
