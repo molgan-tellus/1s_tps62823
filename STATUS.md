@@ -58,8 +58,8 @@ Fab-fält) — fortfarande beställningsklar.
 **Noterat utan åtgärd:** D5-zenertolerans kan ge svag ledning vid panel-tomgång 6,7 V
 (ofarligt); soltermineringens undre hörn tajt (→ mätplan); π-filterplacering bekräftad
 korrekt (filter vid källan + avkoppling vid modulens VDD — krav på modulsidan).
-**Släpar:** hw_spec .odt/.pdf har kvar gamla 5,5 V-raden — regenerera från doc/hw_spec.md
-vid nästa spec-ändring.
+*(Släpet i hw_spec .odt/.pdf åtgärdat 2026-08-04: regenererade från doc/hw_spec.md
+med pandoc → odt, soffice → pdf, i samband med nya §MCU-styrning.)*
 
 ## Layoutgranskning + åtgärder 2026-08-01 (incheckade)
 Tredje granskningen (lager + silkscreen). **Åtgärdat på brädan och i regenererad gerber-zip:**

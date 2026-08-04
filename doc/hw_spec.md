@@ -1,6 +1,6 @@
 # power_kicad — HW-specifikation
 
-**LiPo-kraftmodul för LoRa-noder** · 55,88 × 20,32 mm · 4 lager · rev A.1 (2026-07-31)
+**LiPo-kraftmodul för LoRa-noder** · 55,88 × 20,32 mm · 4 lager · rev A.2 (2026-08-04)
 
 Försörjer en nRF52840 Connect Kit (eller annan MCU) och två SX1262-LoRa-kort från en
 3 000 mAh LiPo-cell, med USB-C/sol-laddning, I2C-strömmätning och <15 µA sömnförbrukning.
@@ -141,6 +141,52 @@ J3 sol (hål: S+/G) · J4 radiomatning (hål: R1/G/R2/G).
 **Testpunkter (fri koppar, Ø1,0 mm):** MP0/MP1/MP2, EN_RF1/EN_RF2, BUCK_EN, PROG,
 VBS, VSOL, SYS, GND — alla expanderutgångar och nyckelnoder mätbara med oscilloskop/multimeter.
 
+## MCU-styrning — firmwarekrav
+
+Reglerna nedan kommer ur designgranskningarna (detaljer i `DESIGN.md`) och är
+**krav, inte rekommendationer** — sömnströmmen och mätnoggrannheten hänger på dem.
+
+### 1. Init-sekvens (tvingande ordning)
+1. **9-puls SCL-recovery** före första transaktionen: I2C-bussen saknar timeout
+   (INA226 + TCA6408A), så en MCU-reset mitt i en transaktion kan lämna SDA låst.
+   Toggla SCL 9 gånger med SDA släppt, skicka sedan STOP.
+2. Skriv expanderns **Output (0x01) = 0x00 FÖRE Config (0x03) = 0xC0** — annars
+   glitchar utgångarna höga när riktningen byts (buck/radior kan blinka till).
+3. Sanity-koll: läs reg 0x03 — `0xFF` betyder att expandern är i reset (failsafe
+   råder: 50 mA-laddning, allt av) och init-sekvensen måste köras.
+4. Efter varje MCU-omstart: kör alltid om sekvensen — expandern behåller annars
+   sitt gamla tillstånd.
+
+### 2. Läs input-registren vid VARJE uppvak (330 µA-fällan)
+USB-i/urkoppling flippar VBS (P6) → TCA6408A **latchar INT låg** tills reg 0x00
+läses. Så länge INT ligger låg läcker pullup-motståndet R31 (10 kΩ) 3,3 V/10 k ≈
+**330 µA ur cellen — 20× hela sömnbudgeten**. Samma mekanism gäller INA226:s
+ALERT-latch (R11).
+
+- Läs **TCA6408A reg 0x00** vid varje uppvak, även spuriösa.
+- Aktivera inte INA226:s alert-latchning i onödan; läs Mask/Enable (0x06) om larm använts.
+- **Sömnströmsvalidering:** mät EFTER en USB-i/ur-cykel, annars missas fällan.
+
+### 3. Sekvensering av laster
+Buck (P5) **före** radio-EN (P3/P4) med ≥1 ms mellanrum — buckens PG-pinne är
+okopplad, så mjukvarufördröjningen är enda garantin för att railen står stabil.
+Därefter ~5 ms innan SX1262-init. I sömn: allt av i omvänd ordning (radior → buck).
+
+### 4. MPPT — perturb & observe (soldrift)
+1. VBS = 1 (USB i)? → sätt 595 mA-steget direkt, ingen P&O.
+2. Annars: stega MP0–MP2 ett steg, **vänta ~1 s** (TP4056 + panel sätter sig),
+   läs INA226 — **laddström läses negativ**.
+3. Ökade skörden → fortsätt åt samma håll; annars backa ett steg.
+4. Kör om var ~1–10 min i soldrift (moln/skuggtransienter); vid panelkollaps
+   (byglad JP1: VSOL-ADC:n viker) → gå ner till 50 mA-steget.
+
+### 5. Kalibrering och mätgränser
+- Kelvin-restfel **~2–3 %** (padintern spridning i shuntlödytorna) — engångskalibrera
+  strömmen mot känd last vid prototypen, lagra korrektionsfaktorn i firmware.
+- INA226 är under sin VS-spec (2,7 V min) vid cellspänning 2,75–3,0 V (LDO-dropout) —
+  lita inte blint på mätvärden nära urladdningsgränsen.
+- Vid USB-drift ser shunten bara cellens nettoström (≈ laddström), inte systemlasten.
+
 ## Typisk driftcykel (LoRa-nod)
 
 ```
@@ -163,6 +209,7 @@ i snitt ≈ **7–8 år teoretiskt** — i praktiken begränsar cellens självur
 | Batteri ENDAST i J2 (JST) | batteri i RF-hålen matar 4,2 V baklänges in i 3,3 V-railen |
 | SX1262 får aldrig matas direkt från cellen | VDD max 3,7 V — använd alltid RF-utgångarna |
 | Summalast 3V3: 1,2–1,5 A kontinuerligt (2,4 A puls), 3V3_MCU max 450 mA, J7-1 max 0,5 A | batterivägens spår (rev A.2), cellskyddets värme resp. LDO-gräns |
+| Verkligt strömtak ~2,4–2,7 A — inte buckens 3 A | DW01A:s överströmströskel (150 mV över 8205A) löser ut efter ~10 ms och stänger batterivägen |
 | Vid USB-drift i värme (>50 °C): max ~1 A last + laddning samtidigt | F1-polyfusens hold-ström sjunker ~2 A→1,5 A vid 60 °C; 1,5 A-lastlöftet gäller fullt ut bara batteridrift |
 | Cellen under ~3,0 V → ladda snarast | skyddet klipper hårt vid 2,4 V |
 
@@ -171,11 +218,14 @@ KiCad 9-projekt (`power_kicad.kicad_pro`), ERC/DRC 0 fel. JLCPCB-paket i `jlcpcb
 gerber-zip, BOM (alla rader med LCSC-nr, basic parts där möjligt) och CPL.
 4 lager, dubbelsidig montering. Design- och komponentmotiveringar: `DESIGN.md`, `BOM.md`.
 
-## Kända begränsningar (rev A)
-- 3 A endast som kortpuls — kontinuerligt gäller 1,5 A (spårbredder + cellskyddets värmeutveckling).
+## Kända begränsningar (rev A.2)
+- 3 A endast som kortpuls — kontinuerligt gäller 1,2–1,5 A (batterivägens spår +
+  cellskyddets värmeutveckling); hårt tak ~2,4–2,7 A där DW01A klipper.
 - Batteriprocent (SoC) beräknas i MCU-mjukvara; ingen hårdvarumätare.
+- Buck i dropout under ~3,5 V cellspänning — 3V3 följer cellen, TX-effekten sjunker.
 - Power-path-FET:en får förhöjt motstånd under ~3,2 V cellspänning (funktion garanterad av body-diod).
-- Rev A är maskinverifierad (ERC/DRC/netlista) men ännu inte fysiskt prototypad.
+- INA226 under VS-spec vid cell 2,75–3,0 V (se §MCU-styrning punkt 5).
+- Rev A.2 är maskinverifierad (ERC/DRC/netlista) och beställd, men ännu inte fysiskt prototypad.
 
 ## Detta kort vs. färdigköpt (Adafruit / SparkFun / Pololu)
 
@@ -210,7 +260,7 @@ En färdigköpt motsvarighet till hela funktionen blir alltså **3–4 staplade 
 - **Kraven är enklare.** Bara "ladda + 3,3 V" utan sömnkrav → Adafruit bq24074 + en
   Pololu-regulator löser det på en kväll, beprövat och färdigtestat.
 - **Riskaptiten är låg.** Adafruit/SparkFun-kort är massproducerade, community-testade och
-  har guider/bibliotek. Detta kort är rev A — designen är maskinverifierad (ERC/DRC/netlista)
+  har guider/bibliotek. Detta kort är rev A.2 — designen är maskinverifierad (ERC/DRC/netlista)
   men **ingen fysisk prototyp har ännu validerats**; räkna med att första batchen är just
   en prototypbatch.
 - **Bränslemätning i %** behövs (State-of-Charge). INA226 mäter ström/spänning exakt, men
